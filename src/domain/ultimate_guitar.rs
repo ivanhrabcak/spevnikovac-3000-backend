@@ -1,9 +1,9 @@
-use std::{cell::Cell, cmp::min, collections::HashMap, io};
+use std::{cmp::min, collections::HashMap, io};
 
 use anyhow::{Context, Error};
 use nom::{
     branch::alt,
-    bytes::complete::{tag, take_while, take_while1, take_while_m_n},
+    bytes::complete::{tag, take_while1, take_while_m_n},
     character::complete::char,
     combinator::{cut, map},
     error::{context, ContextError, ErrorKind, ParseError},
