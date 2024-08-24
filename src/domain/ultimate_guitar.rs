@@ -118,7 +118,7 @@ impl UltimateGuitar {
             let mut target_len = 0;
             for node in previous_line {
                 match node {
-                    TextNode::Text(k) => {
+                    TextNode::Text(ref k) => {
                         target_len += k.len();
 
                         if target_len - k.len() <= current_line_text_string.len() {
@@ -129,8 +129,8 @@ impl UltimateGuitar {
                             ));
                         }
                     }
-                    TextNode::Chord(ch) => {
-                        merged_line.push(TextNode::Chord(ch));
+                    TextNode::Chord(ref ch) => {
+                        merged_line.push(TextNode::Chord(ch.clone()));
                         target_len += Self::CHORD_CHARACTER_WIDTH;
 
                         if target_len - Self::CHORD_CHARACTER_WIDTH
@@ -154,6 +154,24 @@ impl UltimateGuitar {
                         .to_string(),
                 ));
             }
+
+            merged_line = merged_line
+                .iter()
+                .enumerate()
+                .flat_map(|(i, node)| {
+                    if i == 0 {
+                        return vec![node.clone()];
+                    }
+
+                    if matches!(merged_line[i - 1], TextNode::Chord(_))
+                        && matches!(node, TextNode::Chord(_))
+                    {
+                        return vec![TextNode::Text(" ".to_string()), node.clone()];
+                    }
+
+                    vec![node.clone()]
+                })
+                .collect();
 
             merged_lines.push(merged_line);
         }

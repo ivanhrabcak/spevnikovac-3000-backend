@@ -1,5 +1,5 @@
 use docx::{
-    document::{Paragraph, Run},
+    document::{Paragraph, Run, Text, TextSpace},
     formatting::{CharacterProperty, VerticalAlignment},
     Docx,
 };
@@ -20,14 +20,19 @@ impl LyricsWithChords {
         let mut paragraph = Paragraph::default();
         for node in self.text.clone() {
             match node {
-                TextNode::Text(t) => paragraph = paragraph.push(Run::default().push_text(t)),
+                TextNode::Text(t) => {
+                    paragraph = paragraph
+                        .push(Run::default().push_text(Text::from((t, TextSpace::Preserve))))
+                }
                 TextNode::Chord(ch) => {
                     paragraph = paragraph.push(
-                        Run::default().push_text(ch).property(
-                            CharacterProperty::default()
-                                .bold(true)
-                                .vertical_alignment(VerticalAlignment::superscript()),
-                        ),
+                        Run::default()
+                            .push_text(Text::from((ch, TextSpace::Preserve)))
+                            .property(
+                                CharacterProperty::default()
+                                    .bold(true)
+                                    .vertical_alignment(VerticalAlignment::superscript()),
+                            ),
                     )
                 }
                 TextNode::Label(l) => {
