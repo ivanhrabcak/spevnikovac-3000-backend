@@ -12,4 +12,4 @@ scraper = "0.20.0"
 serde_json = "1.0.125"
 tokio = { version = "1.39.3", features = ["full"] }
 xml = "0.8.20"
-docx = { path = "../docx-rs" }
+docx = { path = "./docx-rs" }
