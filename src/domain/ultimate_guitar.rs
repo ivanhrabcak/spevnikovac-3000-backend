@@ -65,10 +65,31 @@ impl UltimateGuitar {
             .replace("[tab]", "")
             .replace("[/tab]", "");
 
-        let nodes = match parse_lyrics_with_chords::<(&str, ErrorKind)>(&tab_data) {
+        let nodes: Vec<TextNode> = match parse_lyrics_with_chords::<(&str, ErrorKind)>(&tab_data) {
             Ok(r) => r,
             Err((e, kind)) => return Err(Error::msg(format!("{}: {}", kind.description(), e))),
-        };
+        }
+        .iter()
+        .map(|n| {
+            if let TextNode::Chord(ch) = n {
+                if ch.contains("B") {
+                    if ch == "B" {
+                        TextNode::Chord("H".to_string())
+                    } else if ch == "Bb" {
+                        TextNode::Chord("B".to_string())
+                    } else if ch == "B#" {
+                        TextNode::Chord("C".to_string())
+                    } else {
+                        unreachable!()
+                    }
+                } else {
+                    n.clone()
+                }
+            } else {
+                n.clone()
+            }
+        })
+        .collect();
 
         let mut lines: Vec<Vec<TextNode>> = Vec::new();
         let mut line = Vec::new();
