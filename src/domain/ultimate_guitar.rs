@@ -1,4 +1,4 @@
-use std::{cmp::min, collections::HashMap, io};
+use std::{collections::HashMap, io};
 
 use anyhow::{Context, Error};
 use itertools::Itertools;
@@ -144,7 +144,7 @@ impl UltimateGuitar {
             }
 
             let mut index = 0;
-            let mut possible_indices: Vec<usize> = current_line_text_string
+            let possible_indices: Vec<usize> = current_line_text_string
                 .split(" ")
                 .enumerate()
                 .flat_map(|(i, t)| {
@@ -159,11 +159,6 @@ impl UltimateGuitar {
                 })
                 .dedup()
                 .collect();
-
-            let l = possible_indices.len();
-            if possible_indices[l - 1] != 0 {
-                // possible_indices[l - 1] -= 1;
-            }
 
             let mut merged_line: Vec<TextNode> =
                 vec![TextNode::Text(current_line_text_string.to_string())];
