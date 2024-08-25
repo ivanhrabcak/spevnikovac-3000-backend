@@ -1,6 +1,7 @@
 use std::{cmp::min, collections::HashMap, io};
 
 use anyhow::{Context, Error};
+use itertools::Itertools;
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_while1, take_while_m_n},
@@ -13,7 +14,7 @@ use nom::{
 use scraper::{Html, Selector};
 use serde_json::Value;
 
-use super::core::{LyricsWithChords, TextNode};
+use super::core::{Appendable, LyricsWithChords, TextNode};
 
 pub struct UltimateGuitar;
 
@@ -86,11 +87,21 @@ impl UltimateGuitar {
         for (i, line) in lines.clone().iter().enumerate() {
             merged_lines.push(line.clone());
 
-            if i == 0 {
-                continue;
+            if line.iter().any(|n| matches!(n, &TextNode::Label(_))) {
+                if let TextNode::Label(l) = line[0].clone() {
+                    if !l.to_lowercase().contains("chorus") {
+                        merged_lines.pop();
+                        merged_lines.push(vec![]);
+                        continue;
+                    } else {
+                        let item = merged_lines.pop().unwrap();
+                        merged_lines.push(vec![]);
+                        merged_lines.push(item);
+                    }
+                }
             }
 
-            if line.iter().any(|n| matches!(n, &TextNode::Label(_))) {
+            if i == 0 {
                 continue;
             }
 
@@ -100,7 +111,25 @@ impl UltimateGuitar {
                 .iter()
                 .any(|n| matches!(n, &TextNode::Chord(_)) && !matches!(n, &TextNode::Label(_)));
 
-            if has_chord || !previous_line_has_chord {
+            if has_chord {
+                merged_lines.pop();
+
+                merged_lines.push(
+                    line.iter()
+                        .filter(|n| matches!(*n, TextNode::Chord(_)))
+                        .enumerate()
+                        .flat_map(|(i, n)| {
+                            if i != 0 {
+                                vec![TextNode::Text(" ".to_string()), n.clone()]
+                            } else {
+                                vec![n.clone()]
+                            }
+                        })
+                        .collect(),
+                );
+                continue;
+            }
+            if !previous_line_has_chord {
                 continue;
             }
 
@@ -114,45 +143,84 @@ impl UltimateGuitar {
                 }
             }
 
-            let mut merged_line: Vec<TextNode> = Vec::new();
+            let mut index = 0;
+            let mut possible_indices: Vec<usize> = current_line_text_string
+                .split(" ")
+                .enumerate()
+                .flat_map(|(i, t)| {
+                    if i != 0 {
+                        index += 1;
+                    }
+
+                    let result = vec![index, index + t.len()];
+                    index += t.len();
+
+                    result
+                })
+                .dedup()
+                .collect();
+
+            let l = possible_indices.len();
+            if possible_indices[l - 1] != 0 {
+                // possible_indices[l - 1] -= 1;
+            }
+
+            let mut merged_line: Vec<TextNode> =
+                vec![TextNode::Text(current_line_text_string.to_string())];
             let mut target_len = 0;
             for node in previous_line {
                 match node {
                     TextNode::Text(ref k) => {
                         target_len += k.len();
-
-                        if target_len - k.len() <= current_line_text_string.len() {
-                            merged_line.push(TextNode::Text(
-                                current_line_text_string[target_len - k.len()
-                                    ..min(target_len, current_line_text_string.len())]
-                                    .to_string(),
-                            ));
-                        }
                     }
                     TextNode::Chord(ref ch) => {
-                        merged_line.push(TextNode::Chord(ch.clone()));
-                        target_len += Self::CHORD_CHARACTER_WIDTH;
+                        let (_, closest_index) = possible_indices
+                            .iter()
+                            .map(|k| (target_len.abs_diff(*k), *k))
+                            .sorted_by(|(a_diff, _ind1), (b_diff, _ind2)| Ord::cmp(a_diff, b_diff))
+                            .nth(0)
+                            .unwrap();
 
-                        if target_len - Self::CHORD_CHARACTER_WIDTH
-                            <= current_line_text_string.len()
-                        {
-                            merged_line.push(TextNode::Text(
-                                current_line_text_string[target_len - Self::CHORD_CHARACTER_WIDTH
-                                    ..min(target_len, current_line_text_string.len())]
-                                    .to_string(),
-                            ))
-                        }
+                        merged_line.push_chord(closest_index, TextNode::Chord(ch.clone()));
+
+                        // let mut current_index = 0;
+                        // merged_line = merged_line
+                        //     .iter()
+                        //     .flat_map(|n| {
+                        //         if let TextNode::Chord(_) = n {
+                        //             vec![n.clone()]
+                        //         } else if let TextNode::Text(t) = n {
+                        //             // the chord belongs to this text block
+                        //             if closest_index >= current_index
+                        //                 && closest_index <= current_index + t.len()
+                        //             {
+                        //                 let start = t[0..closest_index - current_index].to_string();
+                        //                 let end =
+                        //                     t[closest_index - current_index..t.len()].to_string();
+
+                        //                 current_index += t.len();
+
+                        //                 vec![
+                        //                     TextNode::Text(start),
+                        //                     TextNode::Chord(ch.clone()),
+                        //                     TextNode::Text(end),
+                        //                 ]
+                        //             } else {
+                        //                 current_index += t.len();
+
+                        //                 vec![TextNode::Text(t.clone())]
+                        //             }
+                        //         } else {
+                        //             unreachable!();
+                        //         }
+                        //     })
+                        //     .collect();
+
+                        target_len += Self::CHORD_CHARACTER_WIDTH;
                     }
                     TextNode::Label(_) => unreachable!(),
                     TextNode::Newline => unreachable!(),
                 }
-            }
-
-            if target_len < current_line_text_string.len() {
-                merged_line.push(TextNode::Text(
-                    current_line_text_string[target_len..current_line_text_string.len()]
-                        .to_string(),
-                ));
             }
 
             merged_line = merged_line
