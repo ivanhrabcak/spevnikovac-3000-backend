@@ -89,6 +89,8 @@ impl UltimateGuitar {
 
             if line.iter().any(|n| matches!(n, &TextNode::Label(_))) {
                 if let TextNode::Label(l) = line[0].clone() {
+                    // remove all but chorus labels,
+                    // insert a newline in front of all chorus labels
                     if !l.to_lowercase().contains("chorus") {
                         merged_lines.pop();
                         merged_lines.push(vec![]);
@@ -105,6 +107,14 @@ impl UltimateGuitar {
                 continue;
             }
 
+            // ultimate guitar chords are formatted like this:
+            // (chords and lyrics alternate line by line)
+            // [Chords]
+            // [Lyrics]
+            // [Chords]
+            // [Lyrics]
+            // ...
+            // here we merge the chords with lyrics into one line
             let previous_line = lines[i - 1].clone();
             let has_chord = line.iter().any(|n| matches!(n, &TextNode::Chord(_)));
             let previous_line_has_chord = previous_line
@@ -114,6 +124,8 @@ impl UltimateGuitar {
             if has_chord {
                 merged_lines.pop();
 
+                // If there are only chords in this line, we remove the spaces between them
+                // TODO: Detect streaks of chords instead to also delete spaces in lines with both text and chords
                 merged_lines.push(
                     line.iter()
                         .filter(|n| matches!(*n, TextNode::Chord(_)))
@@ -128,14 +140,14 @@ impl UltimateGuitar {
                         .collect(),
                 );
                 continue;
-            }
-            if !previous_line_has_chord {
+            } else if !previous_line_has_chord {
                 continue;
             }
 
             merged_lines.pop();
             merged_lines.pop();
 
+            // Collect the text in this line
             let mut current_line_text_string = "".to_string();
             for node in line.iter() {
                 if let TextNode::Text(t) = node {
@@ -143,6 +155,8 @@ impl UltimateGuitar {
                 }
             }
 
+            // detect where the borders of words are
+            // we do not want to put chords in the middle of words
             let mut index = 0;
             let possible_indices: Vec<usize> = current_line_text_string
                 .split(" ")
@@ -160,8 +174,11 @@ impl UltimateGuitar {
                 .dedup()
                 .collect();
 
+            // we start with only text and split it into pieces
+            // putting the chords in between
             let mut merged_line: Vec<TextNode> =
                 vec![TextNode::Text(current_line_text_string.to_string())];
+
             let mut target_len = 0;
             for node in previous_line {
                 match node {
@@ -169,6 +186,7 @@ impl UltimateGuitar {
                         target_len += k.len();
                     }
                     TextNode::Chord(ref ch) => {
+                        // we find where this chord should be put
                         let (_, closest_index) = possible_indices
                             .iter()
                             .map(|k| (target_len.abs_diff(*k), *k))
@@ -178,39 +196,6 @@ impl UltimateGuitar {
 
                         merged_line.push_chord(closest_index, TextNode::Chord(ch.clone()));
 
-                        // let mut current_index = 0;
-                        // merged_line = merged_line
-                        //     .iter()
-                        //     .flat_map(|n| {
-                        //         if let TextNode::Chord(_) = n {
-                        //             vec![n.clone()]
-                        //         } else if let TextNode::Text(t) = n {
-                        //             // the chord belongs to this text block
-                        //             if closest_index >= current_index
-                        //                 && closest_index <= current_index + t.len()
-                        //             {
-                        //                 let start = t[0..closest_index - current_index].to_string();
-                        //                 let end =
-                        //                     t[closest_index - current_index..t.len()].to_string();
-
-                        //                 current_index += t.len();
-
-                        //                 vec![
-                        //                     TextNode::Text(start),
-                        //                     TextNode::Chord(ch.clone()),
-                        //                     TextNode::Text(end),
-                        //                 ]
-                        //             } else {
-                        //                 current_index += t.len();
-
-                        //                 vec![TextNode::Text(t.clone())]
-                        //             }
-                        //         } else {
-                        //             unreachable!();
-                        //         }
-                        //     })
-                        //     .collect();
-
                         target_len += Self::CHORD_CHARACTER_WIDTH;
                     }
                     TextNode::Label(_) => unreachable!(),
@@ -218,6 +203,7 @@ impl UltimateGuitar {
                 }
             }
 
+            // we delete spaces between streaks of chords
             merged_line = merged_line
                 .iter()
                 .enumerate()
