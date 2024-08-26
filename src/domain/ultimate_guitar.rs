@@ -16,12 +16,18 @@ use serde_json::Value;
 
 use super::core::{Appendable, LyricsWithChords, Options, Source, TextNode};
 
+pub struct RawParsedData {
+    pub artist: String,
+    pub song_name: String,
+    pub tab_view: String,
+}
+
 pub struct UltimateGuitar;
 
 impl UltimateGuitar {
     const CHORD_CHARACTER_WIDTH: usize = 3;
 
-    fn parse_data_from_dom(document: &Html) -> anyhow::Result<String> {
+    fn parse_data_from_dom(document: &Html) -> anyhow::Result<RawParsedData> {
         let selector = Selector::parse(".js-store").map_err(|_| {
             io::Error::new(io::ErrorKind::InvalidData, "Failed to create selector!")
         })?;
@@ -40,13 +46,35 @@ impl UltimateGuitar {
             .replace("\\\\", "\\");
 
         let parsed_content: HashMap<String, Value> = serde_json::from_str(&content).unwrap();
-        let tab_view = parsed_content
+
+        //song_name": String("Just"), "artist_id": Number(578), "artist_name": String("Radiohead"),
+
+        let page_data = parsed_content
             .get("store")
             .context("Unexpected DOM structure! (store)")?
             .get("page")
             .context("Unexpected DOM structure! (page)")?
             .get("data")
-            .context("Unexpected DOM structure! (data)")?
+            .context("Unexpected DOM structure! (data)")?;
+
+        let tab_info = page_data.get("tab").context("Failed to get tab info!")?;
+
+        let artist = tab_info
+            .get("artist_name")
+            .context("Missing artist name!")?
+            .as_str()
+            .context("Failed to convert artist name to string!")?
+            .to_string();
+
+        let song_name = tab_info
+            .get("song_name")
+            .context("Missing song name!")?
+            .as_str()
+            .context("Failed to convert song name to string!")?
+            .to_string();
+        // println!("{}", content);
+
+        let tab_view = page_data
             .get("tab_view")
             .context("Unexpected DOM structure! (tab_view)")?
             .get("wiki_tab")
@@ -54,16 +82,25 @@ impl UltimateGuitar {
             .get("content")
             .context("Unexpected DOM structure! (content)")?
             .as_str()
-            .context("Unexpected content value type!")?;
+            .context("Unexpected content value type!")?
+            .to_string();
 
-        return Ok(tab_view.to_string());
+        return Ok(RawParsedData {
+            artist,
+            song_name,
+            tab_view,
+        });
     }
 }
 
 impl Source for UltimateGuitar {
     fn get(document: &Html, options: Option<Options>) -> anyhow::Result<LyricsWithChords> {
         let user_options = options.unwrap_or_default();
-        let tab_data = Self::parse_data_from_dom(document)?
+
+        let parsed_data = Self::parse_data_from_dom(document)?;
+
+        let tab_data = parsed_data
+            .tab_view
             .replace("\r\n", "\n")
             .replace("[tab]", "")
             .replace("[/tab]", "");
@@ -250,7 +287,11 @@ impl Source for UltimateGuitar {
             merged_lines.push(merged_line);
         }
 
-        Ok(LyricsWithChords::new(merged_lines.join(&TextNode::Newline)))
+        Ok(LyricsWithChords::new(
+            merged_lines.join(&TextNode::Newline),
+            parsed_data.artist,
+            parsed_data.song_name,
+        ))
     }
 }
 

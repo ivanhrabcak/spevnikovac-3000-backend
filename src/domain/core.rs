@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct LyricsWithChords {
     text: Vec<TextNode>,
+    artist: String,
+    song_name: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -30,8 +32,12 @@ pub trait Source {
 }
 
 impl LyricsWithChords {
-    pub fn new(text: Vec<TextNode>) -> Self {
-        Self { text }
+    pub fn new(text: Vec<TextNode>, artist: String, song_name: String) -> Self {
+        Self {
+            text,
+            artist,
+            song_name,
+        }
     }
 
     pub fn render_docx(&self) -> Docx {
