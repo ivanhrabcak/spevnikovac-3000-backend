@@ -3,6 +3,7 @@ name = "spevnik"
 version = "0.1.0"
 edition = "2021"
 
+
 [dependencies]
 anyhow = "1.0.86"
 html-escape = "0.2.13"
@@ -14,3 +15,5 @@ tokio = { version = "1.39.3", features = ["full"] }
 xml = "0.8.20"
 docx = { path = "./docx-rs" }
 itertools = "0.13.0"
+serde = { version = "1.0.209", features = ["derive"] }
+tauri = "1.7.2"

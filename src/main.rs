@@ -1,7 +1,8 @@
-use domain::ultimate_guitar::UltimateGuitar;
+use domain::{core::Source, ultimate_guitar::UltimateGuitar};
 use scraper::Html;
 
 pub mod domain;
+pub mod export;
 
 #[tokio::main]
 async fn main() {
@@ -11,9 +12,9 @@ async fn main() {
     let text = client.get(url).send().await.unwrap().text().await.unwrap();
 
     let document = Html::parse_document(&text);
-    let lyrics = UltimateGuitar::get(&document).unwrap();
+    let lyrics = UltimateGuitar::get(&document, None).unwrap();
 
-    let mut doc = lyrics.render();
+    let mut doc = lyrics.render_docx();
 
     doc.write_file("just.docx").unwrap();
 }

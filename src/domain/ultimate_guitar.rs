@@ -14,7 +14,7 @@ use nom::{
 use scraper::{Html, Selector};
 use serde_json::Value;
 
-use super::core::{Appendable, LyricsWithChords, TextNode};
+use super::core::{Appendable, LyricsWithChords, Options, Source, TextNode};
 
 pub struct UltimateGuitar;
 
@@ -58,8 +58,11 @@ impl UltimateGuitar {
 
         return Ok(tab_view.to_string());
     }
+}
 
-    pub fn get(document: &Html) -> anyhow::Result<LyricsWithChords> {
+impl Source for UltimateGuitar {
+    fn get(document: &Html, options: Option<Options>) -> anyhow::Result<LyricsWithChords> {
+        let user_options = options.unwrap_or_default();
         let tab_data = Self::parse_data_from_dom(document)?
             .replace("\r\n", "\n")
             .replace("[tab]", "")
@@ -117,9 +120,10 @@ impl UltimateGuitar {
                         merged_lines.push(vec![]);
                         continue;
                     } else {
-                        let item = merged_lines.pop().unwrap();
+                        merged_lines.pop();
+
                         merged_lines.push(vec![]);
-                        merged_lines.push(item);
+                        merged_lines.push(vec![TextNode::Label(user_options.chorus_label.clone())]);
                     }
                 }
             }

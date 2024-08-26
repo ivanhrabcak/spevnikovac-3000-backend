@@ -1,12 +1,32 @@
+use anyhow::Result;
 use docx::{
     document::{Paragraph, Run, Text, TextSpace},
     formatting::{CharacterProperty, VerticalAlignment},
     Docx,
 };
+use scraper::Html;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct LyricsWithChords {
     text: Vec<TextNode>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Options {
+    pub chorus_label: String,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            chorus_label: "®:".to_string(),
+        }
+    }
+}
+
+pub trait Source {
+    fn get(document: &Html, options: Option<Options>) -> Result<LyricsWithChords>;
 }
 
 impl LyricsWithChords {
@@ -14,7 +34,7 @@ impl LyricsWithChords {
         Self { text }
     }
 
-    pub fn render(&self) -> Docx {
+    pub fn render_docx(&self) -> Docx {
         let mut doc = Docx::default();
 
         let mut paragraph = Paragraph::default();
@@ -106,7 +126,7 @@ impl Appendable for Vec<TextNode> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum TextNode {
     Text(String),
     Chord(String),
