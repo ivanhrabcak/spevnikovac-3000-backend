@@ -65,7 +65,6 @@ pub fn get_editing_hints(nodes: Vec<TextNode>) -> Vec<EditingHint> {
 
                         p
                     })
-                    .take(parts.len() * 2 - 1)
                     .collect::<Vec<EditingHint>>()
             }
             TextNode::Chord(_) => vec![
