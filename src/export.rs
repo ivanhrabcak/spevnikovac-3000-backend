@@ -42,9 +42,12 @@ pub fn get_editing_hints(nodes: Vec<TextNode>) -> Vec<EditingHint> {
 
                 parts
                     .iter()
-                    .flat_map(|part| {
+                    .enumerate()
+                    .flat_map(|(i, part)| {
                         vec![
-                            EditingHint::Node(TextNode::Text(part.to_string())),
+                            EditingHint::Node(TextNode::Text(
+                                part.to_string() + (if i != parts.len() { " " } else { "" }),
+                            )),
                             EditingHint::PossibleChordPlace,
                         ]
                     })
