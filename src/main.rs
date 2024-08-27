@@ -1,4 +1,5 @@
 use domain::{core::Source, ultimate_guitar::UltimateGuitar};
+use export::get_editing_hints;
 use scraper::Html;
 
 pub mod domain;
@@ -15,6 +16,8 @@ async fn main() {
     let lyrics = UltimateGuitar::get(&document, None).unwrap();
 
     let mut doc = lyrics.render_docx();
+
+    println!("{:?}", get_editing_hints(lyrics.text.clone()));
 
     doc.write_file("just.docx").unwrap();
 }

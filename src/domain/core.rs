@@ -9,9 +9,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct LyricsWithChords {
-    text: Vec<TextNode>,
-    artist: String,
-    song_name: String,
+    pub text: Vec<TextNode>,
+    pub artist: String,
+    pub song_name: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

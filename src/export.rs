@@ -1,3 +1,4 @@
+use docx::document::Text;
 use itertools::Itertools;
 use scraper::Html;
 use serde::{Deserialize, Serialize};
@@ -44,16 +45,25 @@ pub fn get_editing_hints(nodes: Vec<TextNode>) -> Vec<EditingHint> {
                     .iter()
                     .enumerate()
                     .flat_map(|(i, part)| {
-                        if *part == "" {
+                        if part.trim() == "" {
                             return vec![EditingHint::Node(TextNode::Text(" ".to_string()))];
                         }
 
-                        vec![
-                            EditingHint::Node(TextNode::Text(
-                                part.to_string() + (if i != parts.len() { " " } else { "" }),
-                            )),
+                        let mut p = vec![
                             EditingHint::PossibleChordPlace,
-                        ]
+                            EditingHint::Node(TextNode::Text(part.to_string())),
+                        ];
+
+                        if i != parts.len() - 1 {
+                            p.append(&mut vec![
+                                EditingHint::PossibleChordPlace,
+                                EditingHint::Node(TextNode::Text(" ".to_string())),
+                            ]);
+                        }
+
+                        p.push(EditingHint::PossibleChordPlace);
+
+                        p
                     })
                     .take(parts.len() * 2 - 1)
                     .collect::<Vec<EditingHint>>()
@@ -66,6 +76,22 @@ pub fn get_editing_hints(nodes: Vec<TextNode>) -> Vec<EditingHint> {
             TextNode::Label(_) => vec![EditingHint::Node(node.clone())],
             TextNode::Newline => vec![EditingHint::Node(node.clone())],
         })
-        .dedup()
+        .dedup_by(|a, b| {
+            let is_text_node = |n| matches!(n, &EditingHint::Node(TextNode::Text(_)));
+            let is_dedup_node = |n| matches!(n, &EditingHint::PossibleChordPlace);
+            let extract_text = |n: &EditingHint| {
+                if let EditingHint::Node(TextNode::Text(t)) = n.clone() {
+                    t
+                } else {
+                    unreachable!()
+                }
+            };
+
+            if !is_text_node(a) || !is_text_node(b) {
+                is_dedup_node(a) && is_dedup_node(b)
+            } else {
+                extract_text(a) == extract_text(b)
+            }
+        })
         .collect()
 }
