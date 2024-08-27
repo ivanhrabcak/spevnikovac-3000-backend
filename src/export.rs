@@ -44,8 +44,8 @@ pub fn get_editing_hints(nodes: Vec<TextNode>) -> Vec<EditingHint> {
                     .iter()
                     .enumerate()
                     .flat_map(|(i, part)| {
-                        if part.trim() == "" {
-                            return vec![EditingHint::Node(TextNode::Text(part.to_string()))];
+                        if *part == "" {
+                            return vec![EditingHint::Node(TextNode::Text(" ".to_string()))];
                         }
 
                         vec![
