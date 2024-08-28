@@ -1,4 +1,7 @@
-use docx::document::Text;
+use docx::{
+    document::{BodyContent, Break, BreakType, Paragraph, Run},
+    Docx,
+};
 use itertools::Itertools;
 use scraper::Html;
 use serde::{Deserialize, Serialize};
@@ -93,4 +96,39 @@ pub fn get_editing_hints(nodes: Vec<TextNode>) -> Vec<EditingHint> {
             }
         })
         .collect()
+}
+
+#[tauri::command]
+pub fn write_docx(songs: Vec<LyricsWithChords>, path: String) -> Result<(), String> {
+    let mut whole_document = Docx::default();
+
+    for (song_i, song) in songs.iter().enumerate() {
+        let song_paragraphs = song.clone().render_docx();
+        for (i, paragraph) in song_paragraphs.iter().enumerate() {
+            if song_i != 0 && i == 0 {
+                let mut p = paragraph.clone();
+
+                // TODO: Make page breaks work
+                p.content.insert(
+                    0,
+                    docx::document::ParagraphContent::Run(
+                        Run::default().push_break(Break::from(BreakType::Page)),
+                    ),
+                );
+
+                whole_document.document.push(p);
+            } else {
+                whole_document.document.push(paragraph.clone());
+            }
+        }
+    }
+
+    whole_document
+        .write_file(path)
+        .map_err(|e| match e {
+            docx::DocxError::IO(e) => e.to_string(),
+            docx::DocxError::Xml(_e) => "Xml Error!".to_string(),
+            docx::DocxError::Zip(e) => e.to_string(),
+        })
+        .map(|_| ())
 }

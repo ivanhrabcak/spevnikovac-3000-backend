@@ -40,8 +40,19 @@ impl LyricsWithChords {
         }
     }
 
-    pub fn render_docx(&self) -> Docx {
-        let mut doc = Docx::default();
+    pub fn render_docx<'a>(self) -> Vec<Paragraph<'a>> {
+        let mut paragraphs = Vec::new();
+
+        let title_paragraph = Paragraph::default().push(
+            Run::default()
+                .push_text(Text::from((
+                    format!("{} - {}", self.artist, self.song_name),
+                    TextSpace::Preserve,
+                )))
+                .property(CharacterProperty::default().bold(true)),
+        );
+
+        paragraphs.push(title_paragraph);
 
         let mut paragraph = Paragraph::default();
         for node in self.text.clone() {
@@ -69,17 +80,17 @@ impl LyricsWithChords {
                     )
                 }
                 TextNode::Newline => {
-                    doc.document.push(paragraph);
+                    paragraphs.push(paragraph);
                     paragraph = Paragraph::default();
                 }
             };
         }
 
         if paragraph.content.len() != 0 {
-            doc.document.push(paragraph);
+            paragraphs.push(paragraph);
         }
 
-        doc
+        paragraphs
     }
 }
 
