@@ -50,10 +50,10 @@ impl Supermusic {
             .text()
             .collect::<Vec<&str>>();
 
-        // remove whitespace
-        song_template.drain(0..9);
-
         println!("{:?}", song_template);
+
+        // remove whitespace
+        song_template.drain(0..8);
 
         let nodes = match parse_lyrics_with_chords::<(&str, ErrorKind)>(&song_template.join("")) {
             Ok(r) => r,
