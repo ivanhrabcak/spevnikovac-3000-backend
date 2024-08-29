@@ -167,8 +167,15 @@ impl Supermusic {
 
             reordered_line = reordered_line
                 .iter()
+                .map(|n| {
+                    if let TextNode::Chord(ch) = n {
+                        return TextNode::Chord(ch.replace("Es", "Eb").replace("As", "Ab"));
+                    } else {
+                        n.clone()
+                    }
+                })
                 .filter(|n| {
-                    if let &TextNode::Text(t) = n {
+                    if let TextNode::Text(t) = n.clone() {
                         return t != "";
                     }
 
