@@ -21,7 +21,7 @@ pub struct Supermusic {}
 impl Supermusic {
     pub fn get(
         document: &scraper::Html,
-        txt_export_document: &scraper::Html,
+        txt_export_document: String,
     ) -> anyhow::Result<super::core::LyricsWithChords> {
         let song_name_selector = Selector::parse(".test3").map_err(|_| {
             io::Error::new(io::ErrorKind::InvalidData, "Failed to create selector!")
@@ -39,23 +39,13 @@ impl Supermusic {
             return Err(anyhow::Error::msg("Unexpected structure of song title"));
         };
 
-        let song_template_selector = Selector::parse("table").map_err(|_| {
-            io::Error::new(io::ErrorKind::InvalidData, "Failed to create selector!")
-        })?;
-
-        let mut song_template: Vec<&str> = txt_export_document
-            .select(&song_template_selector)
-            .nth(0)
-            .context("Unexpected DOM structore!")?
-            .text()
-            .collect::<Vec<&str>>();
-
-        println!("{:?}", song_template);
+        let lf_template = txt_export_document.replace("\r\n", "\n");
+        let mut song_template: Vec<&str> = lf_template.split("\n").collect();
 
         // remove whitespace
-        song_template.drain(0..8);
+        song_template.drain(0..2);
 
-        let nodes = match parse_lyrics_with_chords::<(&str, ErrorKind)>(&song_template.join("")) {
+        let nodes = match parse_lyrics_with_chords::<(&str, ErrorKind)>(&song_template.join("\n")) {
             Ok(r) => r,
             Err((e, kind)) => {
                 return Err(anyhow::Error::msg(format!("{}: {}", kind.description(), e)))
@@ -72,7 +62,7 @@ impl Supermusic {
             _ => line.push(n.clone()),
         });
 
-        let mut corrected_lines = Vec::new();
+        let mut corrected_lines: Vec<Vec<TextNode>> = Vec::new();
         for line in lines {
             let get_text = |n| {
                 if let TextNode::Text(t) = n {
@@ -175,7 +165,39 @@ impl Supermusic {
                 .iter()
                 .for_each(|(i, ch)| reordered_line.push_chord(*i, ch.clone()));
 
-            corrected_lines.push(reordered_line);
+            reordered_line = reordered_line
+                .iter()
+                .filter(|n| {
+                    if let &TextNode::Text(t) = n {
+                        return t != "";
+                    }
+
+                    true
+                })
+                .map(|n| n.clone())
+                .collect();
+
+            corrected_lines.push(
+                reordered_line
+                    .iter()
+                    .enumerate()
+                    .flat_map(|(i, n)| {
+                        if i == 0 {
+                            return vec![n.clone()];
+                        }
+
+                        let previous = reordered_line[i - 1].clone();
+
+                        if matches!(previous, TextNode::Chord(_))
+                            && matches!(n, &TextNode::Chord(_))
+                        {
+                            vec![TextNode::Text(" ".to_string()), n.clone()]
+                        } else {
+                            vec![n.clone()]
+                        }
+                    })
+                    .collect(),
+            );
         }
 
         Ok(LyricsWithChords::new(
@@ -198,7 +220,7 @@ impl Supermusic {
             .unwrap();
 
         let text_export_url = format!(
-            "https://supermusic.cz/export.php?idpiesne={}6&typ=TXT",
+            "https://supermusic.cz/export.php?idpiesne={}&stiahni=1&typ=TXT&sid=",
             song_id
         );
 
@@ -206,10 +228,7 @@ impl Supermusic {
         let text_export_response = client.get(text_export_url).send().await?.text().await?;
         let main_document = client.get(url).send().await?.text().await?;
 
-        Self::get(
-            &Html::parse_document(&main_document),
-            &Html::parse_document(&text_export_response),
-        )
+        Self::get(&Html::parse_document(&main_document), text_export_response)
     }
 }
 

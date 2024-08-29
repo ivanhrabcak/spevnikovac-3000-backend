@@ -7,8 +7,7 @@ pub mod export;
 
 #[tokio::main]
 async fn main() {
-    let url = "https://supermusic.cz/skupina.php?idpiesne=454926&sid=&TEXT=1";
-    let txt_url = "https://supermusic.cz/export.php?idpiesne=454926&typ=TXT";
+    let url = "https://supermusic.cz/skupina.php?idpiesne=198707&sid=";
 
     // let client = reqwest::Client::new();
 
