@@ -53,6 +53,8 @@ impl Supermusic {
         // remove whitespace
         song_template.drain(0..9);
 
+        println!("{:?}", song_template);
+
         let nodes = match parse_lyrics_with_chords::<(&str, ErrorKind)>(&song_template.join("")) {
             Ok(r) => r,
             Err((e, kind)) => {
