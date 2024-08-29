@@ -14,7 +14,7 @@ use nom::{
 use scraper::{Html, Selector};
 use serde_json::Value;
 
-use super::core::{Appendable, LyricsWithChords, Options, Source, TextNode};
+use super::core::{Appendable, LyricsWithChords, Options, TextNode};
 
 pub struct RawParsedData {
     pub artist: String,
@@ -91,10 +91,8 @@ impl UltimateGuitar {
             tab_view,
         });
     }
-}
 
-impl Source for UltimateGuitar {
-    fn get(document: &Html, options: Option<Options>) -> anyhow::Result<LyricsWithChords> {
+    pub fn get(document: &Html, options: Option<Options>) -> anyhow::Result<LyricsWithChords> {
         let user_options = options.unwrap_or_default();
 
         let parsed_data = Self::parse_data_from_dom(document)?;
@@ -295,7 +293,7 @@ impl Source for UltimateGuitar {
     }
 }
 
-pub fn string<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
+fn string<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     i: &'a str,
 ) -> IResult<&'a str, &'a str, E> {
     let chars = "\n[]";
@@ -303,20 +301,20 @@ pub fn string<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     take_while1(move |c| !chars.contains(c))(i)
 }
 
-pub fn text<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
+fn text<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     i: &'a str,
 ) -> IResult<&'a str, TextNode, E> {
     map(string, |s: &str| TextNode::Text(s.to_string()))(i)
 }
 
-pub fn newline<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
+fn newline<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     i: &'a str,
 ) -> IResult<&'a str, TextNode, E> {
     let newline_take_while = take_while_m_n(1, 1, move |c| c == '\n');
     map(newline_take_while, |_| TextNode::Newline)(i)
 }
 
-pub fn chord<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
+fn chord<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     i: &'a str,
 ) -> IResult<&'a str, TextNode, E> {
     context(
@@ -328,7 +326,7 @@ pub fn chord<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     )(i)
 }
 
-pub fn label<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
+fn label<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     i: &'a str,
 ) -> IResult<&'a str, TextNode, E> {
     context(
@@ -339,7 +337,7 @@ pub fn label<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     )(i)
 }
 
-pub fn parse_lyrics_with_chords<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
+fn parse_lyrics_with_chords<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     i: &'a str,
 ) -> Result<Vec<TextNode>, E> {
     let mut tag_parser = alt((

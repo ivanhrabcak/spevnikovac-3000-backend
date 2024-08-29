@@ -27,10 +27,6 @@ impl Default for Options {
     }
 }
 
-pub trait Source {
-    fn get(document: &Html, options: Option<Options>) -> Result<LyricsWithChords>;
-}
-
 impl LyricsWithChords {
     pub fn new(text: Vec<TextNode>, artist: String, song_name: String) -> Self {
         Self {

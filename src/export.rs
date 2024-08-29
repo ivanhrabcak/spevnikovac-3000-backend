@@ -7,7 +7,8 @@ use scraper::Html;
 use serde::{Deserialize, Serialize};
 
 use crate::domain::{
-    core::{LyricsWithChords, Source, TextNode},
+    core::{LyricsWithChords, TextNode},
+    supermusic::Supermusic,
     ultimate_guitar::UltimateGuitar,
 };
 
@@ -21,19 +22,27 @@ pub enum EditingHint {
 pub async fn fetch(url: String) -> Result<LyricsWithChords, String> {
     let client = reqwest::Client::new();
 
-    let response = match client.get(url).send().await {
-        Ok(r) => r,
-        Err(e) => return Err(e.to_string()),
-    };
+    if url.contains("ultimate-guitar.com") {
+        let response = match client.get(url).send().await {
+            Ok(r) => r,
+            Err(e) => return Err(e.to_string()),
+        };
 
-    let text = match response.text().await {
-        Ok(t) => t,
-        Err(e) => return Err(e.to_string()),
-    };
+        let text = match response.text().await {
+            Ok(t) => t,
+            Err(e) => return Err(e.to_string()),
+        };
 
-    let document = Html::parse_document(&text);
+        let document = Html::parse_document(&text);
 
-    UltimateGuitar::get(&document, None).map_err(|e| e.to_string())
+        UltimateGuitar::get(&document, None).map_err(|e| e.to_string())
+    } else if url.contains("supermusic.cz") {
+        Supermusic::fetch_whole(url)
+            .await
+            .map_err(|e| e.to_string())
+    } else {
+        Err("This source is not supported!".to_string())
+    }
 }
 
 #[tauri::command]
