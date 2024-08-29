@@ -132,3 +132,12 @@ pub fn write_docx(songs: Vec<LyricsWithChords>, path: String) -> Result<(), Stri
         })
         .map(|_| ())
 }
+
+#[tauri::command]
+pub fn transpose(nodes: Vec<TextNode>, modifier: i32) -> Vec<TextNode> {
+    let mut dummy_lyrics = LyricsWithChords::new(nodes, "".to_string(), "".to_string());
+
+    dummy_lyrics.transpose(modifier);
+
+    return dummy_lyrics.text;
+}

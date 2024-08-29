@@ -28,7 +28,9 @@ async fn main() {
     let document = Html::parse_document(&text);
     let document_1 = Html::parse_document(&text_1);
 
-    let lyrics = UltimateGuitar::get(&document, None).unwrap();
+    let mut lyrics = UltimateGuitar::get(&document, None).unwrap();
+
+    lyrics.transpose(2);
     let lyrics_1: LyricsWithChords = UltimateGuitar::get(&document_1, None).unwrap();
     // let mut doc = lyrics.render_docx();
 

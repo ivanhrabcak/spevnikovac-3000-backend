@@ -92,6 +92,117 @@ impl LyricsWithChords {
 
         paragraphs
     }
+
+    fn transpose_chord(chord: String, modifier: i32) -> String {
+        let mut transposed_chord: String;
+
+        let mut chord_type = 0;
+        if chord.starts_with("C#") {
+            chord_type = 1;
+        } else if chord.starts_with("D#") {
+            chord_type = 3;
+        } else if chord.starts_with("Eb") {
+            if !chord.starts_with("Ebsu") {
+                chord_type = 3;
+            } else {
+                chord_type = 4;
+            }
+        } else if chord.starts_with("F#") {
+            chord_type = 6;
+        } else if chord.starts_with("G#") {
+            chord_type = 8;
+        } else if chord.starts_with("Ab") {
+            if !chord.starts_with("Absu") {
+                chord_type = 8;
+            } else {
+                chord_type = 9;
+            }
+        } else if chord.starts_with("A#") {
+            chord_type = 10;
+        } else if chord.starts_with("Bb") {
+            chord_type = 10;
+        }
+
+        if chord_type == 0 {
+            chord_type = match chord.chars().nth(0).unwrap() {
+                'C' => 0,
+                'D' => 2,
+                'E' => 4,
+                'F' => 5,
+                'G' => 7,
+                'A' => 9,
+                'B' => 10,
+                'H' => 11,
+                _ => unreachable!(),
+            };
+
+            transposed_chord = chord[1..chord.len()].to_string();
+        } else {
+            transposed_chord = chord[2..chord.len()].to_string();
+        }
+
+        chord_type += modifier;
+
+        if chord_type > 11 {
+            chord_type -= 12;
+        } else if chord_type < 0 {
+            chord_type += 12;
+        }
+
+        transposed_chord = match chord_type {
+            0 => "C".to_string() + &transposed_chord,
+            1 => "C#".to_string() + &transposed_chord,
+            2 => "D".to_string() + &transposed_chord,
+            3 => "Eb".to_string() + &transposed_chord,
+            4 => "E".to_string() + &transposed_chord,
+            5 => "F".to_string() + &transposed_chord,
+            6 => "F#".to_string() + &transposed_chord,
+            7 => "G".to_string() + &transposed_chord,
+            8 => "Ab".to_string() + &transposed_chord,
+            9 => "A".to_string() + &transposed_chord,
+            10 => "B".to_string() + &transposed_chord,
+            11 => "H".to_string() + &transposed_chord,
+            _ => unreachable!(),
+        };
+
+        if chord.contains("/") {
+            let mut parts = chord.split("/").collect::<Vec<&str>>();
+
+            transposed_chord = parts.remove(0).to_string()
+                + "/"
+                + &parts
+                    .iter()
+                    .map(|chord| Self::transpose_chord(chord.to_string(), modifier))
+                    .collect::<Vec<String>>()
+                    .join("/");
+        }
+
+        transposed_chord
+    }
+
+    pub fn transpose(&mut self, modifier: i32) {
+        self.text = self
+            .text
+            .iter()
+            .map(|n| {
+                if !matches!(n, &TextNode::Chord(_)) {
+                    return n.clone();
+                }
+
+                let get_chord = |n: &TextNode| {
+                    if let TextNode::Chord(ch) = n.clone() {
+                        ch
+                    } else {
+                        unreachable!()
+                    }
+                };
+
+                let chord = get_chord(n);
+
+                TextNode::Chord(Self::transpose_chord(chord, modifier))
+            })
+            .collect()
+    }
 }
 
 pub trait Appendable {
