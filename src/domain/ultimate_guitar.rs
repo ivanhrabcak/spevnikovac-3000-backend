@@ -256,7 +256,7 @@ impl UltimateGuitar {
 
                         merged_line.push_chord(closest_index, TextNode::Chord(ch.clone()));
 
-                        target_len += Self::CHORD_CHARACTER_WIDTH;
+                        target_len += Self::CHORD_CHARACTER_WIDTH.max(ch.len());
                     }
                     TextNode::Label(_) => unreachable!(),
                     TextNode::Newline => unreachable!(),
