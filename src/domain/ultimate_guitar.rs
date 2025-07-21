@@ -111,14 +111,14 @@ impl UltimateGuitar {
         .map(|n| {
             if let TextNode::Chord(ch) = n {
                 if ch.contains("B") {
-                    if ch == "B" {
-                        TextNode::Chord("H".to_string())
-                    } else if ch == "Bb" {
-                        TextNode::Chord("B".to_string())
-                    } else if ch == "B#" {
-                        TextNode::Chord("C".to_string())
+                    if ch.starts_with("Bb") {
+                        TextNode::Chord(ch.replace("Bb", "B").to_string())
+                    } else if ch.starts_with("B#") {
+                        TextNode::Chord(ch.replace("B#", "C").to_string())
+                    } else if ch.starts_with("B") {
+                        TextNode::Chord(ch.replace("B", "H").to_string())
                     } else {
-                        unreachable!()
+                        TextNode::Chord(ch.replace("B", "H").to_string())
                     }
                 } else {
                     n.clone()
