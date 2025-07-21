@@ -7,25 +7,21 @@ pub mod export;
 
 #[tokio::main]
 async fn main() {
-    let url = "https://supermusic.cz/skupina.php?idpiesne=198707&sid=";
+    // let url = "https://supermusic.cz/skupina.php?idpiesne=198707&sid=";
+    // let url = "https://supermusic.cz/skupina.php?idpiesne=4523&sid=";
+    let url = "https://tabs.ultimate-guitar.com/tab/bill-withers/lovely-day-chords-1135417";
 
-    // let client = reqwest::Client::new();
+    let client = reqwest::Client::new();
 
-    // let text = client.get(url).send().await.unwrap().text().await.unwrap();
-    // let text_1 = client
-    //     .get(txt_url)
-    //     .send()
-    //     .await
-    //     .unwrap()
-    //     .text()
-    //     .await
-    //     .unwrap();
+    let text = client.get(url).send().await.unwrap().text().await.unwrap();
+    let text_1 = client.get(url).send().await.unwrap().text().await.unwrap();
 
-    // let document = Html::parse_document(&text);
+    let document = Html::parse_document(&text);
 
     // let lyrics = Supermusic::get(&document, &Html::parse_document(&text_1)).unwrap();
 
-    let lyrics = Supermusic::fetch_whole(url.to_string()).await.unwrap();
+    // let lyrics = Supermusic::fetch_whole(url.to_string()).await.unwrap();
+    let lyrics = UltimateGuitar::get(&document, None).unwrap();
 
     // let mut doc = lyrics.render_docx();
 

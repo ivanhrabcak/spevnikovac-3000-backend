@@ -64,8 +64,11 @@ impl Supermusic {
 
         let mut corrected_lines: Vec<Vec<TextNode>> = Vec::new();
         for line in lines {
+            println!("{:?}", line);
             let get_text = |n| {
                 if let TextNode::Text(t) = n {
+                    t
+                } else if let TextNode::Chord(t) = n {
                     t
                 } else {
                     unreachable!()
