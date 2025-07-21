@@ -39,6 +39,8 @@ impl Supermusic {
             return Err(anyhow::Error::msg("Unexpected structure of song title"));
         };
 
+        println!("Parsed artist and song: {artist}: {song_name}");
+
         let lf_template = txt_export_document.replace("\r\n", "\n");
         let mut song_template: Vec<&str> = lf_template.split("\n").collect();
 
@@ -242,10 +244,14 @@ impl Supermusic {
     }
 }
 
-fn string<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
+fn string<'a, const ALLOW_NEWLINE: bool, E: ParseError<&'a str> + ContextError<&'a str>>(
     i: &'a str,
 ) -> IResult<&'a str, &'a str, E> {
-    let chars = "\n[]";
+    let chars = if ALLOW_NEWLINE {
+        "".to_string()
+    } else {
+        "\n".to_string()
+    } + "[]";
 
     take_while1(move |c| !chars.contains(c))(i)
 }
@@ -255,7 +261,7 @@ fn chord_block<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
 ) -> IResult<&'a str, TextNode, E> {
     context(
         "chord",
-        map(delimited(char('['), string, char(']')), |o| {
+        map(delimited(char('['), string::<true, E>, char(']')), |o| {
             TextNode::Chord(o.to_string())
         }),
     )(i)
@@ -264,7 +270,10 @@ fn chord_block<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
 fn text<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     i: &'a str,
 ) -> IResult<&'a str, TextNode, E> {
-    context("text", map(string, |o| TextNode::Text(o.to_string())))(i)
+    context(
+        "text",
+        map(string::<false, E>, |o| TextNode::Text(o.to_string())),
+    )(i)
 }
 
 fn newline<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
