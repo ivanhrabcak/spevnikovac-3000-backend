@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io};
+use std::{collections::HashSet, io};
 
 use anyhow::{Context, Error};
 use itertools::Itertools;
@@ -11,7 +11,7 @@ use nom::{
     sequence::{delimited, preceded, terminated},
     IResult,
 };
-use scraper::{Html, Selector};
+use scraper::{Html, Node, Selector};
 use serde_json::Value;
 
 use super::core::{Appendable, LyricsWithChords, Options, TextNode};
@@ -27,69 +27,83 @@ pub struct UltimateGuitar;
 impl UltimateGuitar {
     const CHORD_CHARACTER_WIDTH: usize = 3;
 
+    /// Ultimate Guitar embeds schema.org structured data for the song in a
+    /// `<script type="application/ld+json">` tag; that's a much more stable
+    /// source for the artist/title than the (hashed, build-specific) CSS
+    /// classes the rest of the page uses.
+    fn parse_song_info(document: &Html) -> anyhow::Result<(String, String)> {
+        let script_selector = Selector::parse(r#"script[type="application/ld+json"]"#).map_err(
+            |_| io::Error::new(io::ErrorKind::InvalidData, "Failed to create selector!"),
+        )?;
+
+        for element in document.select(&script_selector) {
+            let text: String = element.text().collect();
+            let Ok(value) = serde_json::from_str::<Value>(&text) else {
+                continue;
+            };
+
+            let artist = value
+                .get("byArtist")
+                .and_then(|a| a.get("name"))
+                .and_then(|n| n.as_str());
+            let song_name = value.get("name").and_then(|n| n.as_str());
+
+            if let (Some(artist), Some(song_name)) = (artist, song_name) {
+                return Ok((artist.to_string(), song_name.to_string()));
+            }
+        }
+
+        Err(Error::msg("Unexpected document structure! (song info)"))
+    }
+
+    /// Walks the chord sheet `<pre>` element, turning `<span data-name="...">`
+    /// chord markup back into the `[ch]X[/ch]` bracket tags the rest of this
+    /// module already knows how to parse. Non-span elements (Ultimate Guitar
+    /// injects ad/marker elements like a trailing `<div>` directly inside the
+    /// `<pre>`) are skipped since they aren't part of the tab.
+    fn extract_tab_markup(node: ego_tree::NodeRef<Node>) -> String {
+        let mut out = String::new();
+
+        for child in node.children() {
+            match child.value() {
+                Node::Text(t) => out.push_str(t),
+                Node::Element(e) if e.name() == "span" => {
+                    if let Some(chord_name) = e.attr("data-name") {
+                        out.push_str("[ch]");
+                        out.push_str(chord_name);
+                        out.push_str("[/ch]");
+                    } else {
+                        out.push_str(&Self::extract_tab_markup(child));
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        out
+    }
+
     fn parse_data_from_dom(document: &Html) -> anyhow::Result<RawParsedData> {
-        let selector = Selector::parse(".js-store").map_err(|_| {
+        let (artist, song_name) = Self::parse_song_info(document)?;
+
+        let pre_selector = Selector::parse("pre").map_err(|_| {
             io::Error::new(io::ErrorKind::InvalidData, "Failed to create selector!")
         })?;
 
-        let elem = document
-            .select(&selector)
+        let pre_element = document
+            .select(&pre_selector)
             .nth(0)
-            .context("Unexpected document structure!")?;
+            .context("Unexpected document structure! (pre)")?;
 
-        let data_content_attribute = elem
-            .attr("data-content")
-            .context("Missing data-content attribute!")?;
+        let raw_markup = Self::extract_tab_markup(*pre_element);
+        let known_chords = collect_known_chords(&raw_markup);
+        let tab_view = tag_plain_chord_lines(&raw_markup, &known_chords);
 
-        let content = html_escape::decode_html_entities(data_content_attribute)
-            .to_string()
-            .replace("\\\\", "\\");
-
-        let parsed_content: HashMap<String, Value> = serde_json::from_str(&content).unwrap();
-
-        //song_name": String("Just"), "artist_id": Number(578), "artist_name": String("Radiohead"),
-
-        let page_data = parsed_content
-            .get("store")
-            .context("Unexpected DOM structure! (store)")?
-            .get("page")
-            .context("Unexpected DOM structure! (page)")?
-            .get("data")
-            .context("Unexpected DOM structure! (data)")?;
-
-        let tab_info = page_data.get("tab").context("Failed to get tab info!")?;
-
-        let artist = tab_info
-            .get("artist_name")
-            .context("Missing artist name!")?
-            .as_str()
-            .context("Failed to convert artist name to string!")?
-            .to_string();
-
-        let song_name = tab_info
-            .get("song_name")
-            .context("Missing song name!")?
-            .as_str()
-            .context("Failed to convert song name to string!")?
-            .to_string();
-        // println!("{}", content);
-
-        let tab_view = page_data
-            .get("tab_view")
-            .context("Unexpected DOM structure! (tab_view)")?
-            .get("wiki_tab")
-            .context("Unexpected DOM structure! (wiki_tab)")?
-            .get("content")
-            .context("Unexpected DOM structure! (content)")?
-            .as_str()
-            .context("Unexpected content value type!")?
-            .to_string();
-
-        return Ok(RawParsedData {
+        Ok(RawParsedData {
             artist,
             song_name,
             tab_view,
-        });
+        })
     }
 
     pub fn get(document: &Html, options: Option<Options>) -> anyhow::Result<LyricsWithChords> {
@@ -291,6 +305,145 @@ impl UltimateGuitar {
             parsed_data.song_name,
         ))
     }
+}
+
+/// Ultimate Guitar prints a chord-diagram legend above the tab body (e.g.
+/// "G     3-5-5-4-3-3": a chord name followed by a dash-separated fret
+/// pattern). It lists every chord used in the song, so we use it to
+/// recognize chords that aren't wrapped in `<span data-name>` markup.
+fn legend_chord_name(line: &str) -> Option<String> {
+    let trimmed = line.trim_end();
+    let (name, rest) = trimmed.split_once(char::is_whitespace)?;
+    let rest = rest.trim_start();
+
+    if name.is_empty() {
+        return None;
+    }
+
+    let frets: Vec<&str> = rest.split('-').collect();
+    let looks_like_fret_diagram = frets.len() >= 3
+        && frets.iter().all(|p| {
+            !p.is_empty()
+                && p.chars()
+                    .all(|c| c.is_ascii_digit() || matches!(c, 'x' | 'X' | 'o' | 'O'))
+        });
+
+    looks_like_fret_diagram.then(|| name.to_string())
+}
+
+fn collect_known_chords(text: &str) -> HashSet<String> {
+    text.lines().filter_map(legend_chord_name).collect()
+}
+
+fn looks_like_chord(token: &str, known_chords: &HashSet<String>) -> bool {
+    if token.is_empty() {
+        return false;
+    }
+
+    if known_chords.contains(token) {
+        return true;
+    }
+
+    let starts_with_note = matches!(token.chars().next(), Some('A'..='H'));
+
+    starts_with_note
+        && token.len() <= 8
+        && token
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '#' | 'b' | '/' | '+'))
+}
+
+/// Rewrites every maximal run of non-whitespace characters in `text`,
+/// preserving the original whitespace layout (needed to keep chords aligned
+/// over the right syllable once merged with the lyric line below).
+fn wrap_words(text: &str, wrap: impl Fn(&str) -> String) -> String {
+    let mut out = String::new();
+    let mut word_start: Option<usize> = None;
+
+    for (i, c) in text.char_indices() {
+        if c.is_whitespace() {
+            if let Some(start) = word_start.take() {
+                out.push_str(&wrap(&text[start..i]));
+            }
+            out.push(c);
+        } else if word_start.is_none() {
+            word_start = Some(i);
+        }
+    }
+
+    if let Some(start) = word_start {
+        out.push_str(&wrap(&text[start..]));
+    }
+
+    out
+}
+
+/// Ultimate Guitar only wraps *some* chord occurrences in interactive
+/// `<span data-name>` markup; repeats later in the tab are often left as
+/// plain text. For every line that isn't a chord-diagram legend, this checks
+/// whether *every* token on the line (already-tagged `[ch]...[/ch]` spans
+/// count automatically) looks like a chord, and if so, wraps the remaining
+/// plain-text tokens in `[ch]...[/ch]` too. Lines that mix real lyrics with
+/// chord-like words are left completely untouched.
+fn tag_plain_chord_lines(text: &str, known_chords: &HashSet<String>) -> String {
+    text.lines()
+        .map(|line| {
+            if legend_chord_name(line).is_some() {
+                // Drop chord-diagram legend lines entirely; they aren't lyrics.
+                return String::new();
+            }
+
+            if line.trim().is_empty() {
+                return line.to_string();
+            }
+
+            // Split out already-tagged `[ch]...[/ch]` spans so only the
+            // plain-text parts need to be classified.
+            let mut segments: Vec<(&str, bool)> = Vec::new();
+            let mut rest = line;
+            while let Some(start) = rest.find("[ch]") {
+                if start > 0 {
+                    segments.push((&rest[..start], false));
+                }
+
+                match rest[start..].find("[/ch]") {
+                    Some(end) => {
+                        let end = start + end + "[/ch]".len();
+                        segments.push((&rest[start..end], true));
+                        rest = &rest[end..];
+                    }
+                    None => {
+                        segments.push((&rest[start..], false));
+                        rest = "";
+                        break;
+                    }
+                }
+            }
+            if !rest.is_empty() {
+                segments.push((rest, false));
+            }
+
+            let all_chord_shaped = segments.iter().all(|(segment, is_tag)| {
+                *is_tag || segment.split_whitespace().all(|tok| looks_like_chord(tok, known_chords))
+            });
+
+            if !all_chord_shaped {
+                return line.to_string();
+            }
+
+            segments
+                .into_iter()
+                .map(|(segment, is_tag)| {
+                    if is_tag {
+                        segment.to_string()
+                    } else {
+                        wrap_words(segment, |word| format!("[ch]{word}[/ch]"))
+                    }
+                })
+                .collect()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn string<'a, E: ParseError<&'a str> + ContextError<&'a str>>(

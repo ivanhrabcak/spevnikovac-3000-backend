@@ -647,7 +647,7 @@ dependencies = [
 [[package]]
 name = "docx"
 version = "1.1.2"
-source = "git+https://github.com/ivanhrabcak/docx-rs#ab883ce1e58c854c645524652d3d1cc1026067f9"
+source = "git+https://github.com/ivanhrabcak/docx-rs#6b75730236d409dd096207e844df8582c58b2e78"
 dependencies = [
  "derive_more",
  "jetscii",
@@ -1275,15 +1275,6 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
-
-[[package]]
-name = "html-escape"
-version = "0.2.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d1ad449764d627e22bfd7cd5e8868264fc9236e07c752972b4080cd351cb476"
-dependencies = [
- "utf8-width",
-]
 
 [[package]]
 name = "html5ever"
@@ -3215,7 +3206,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "docx",
- "html-escape",
+ "ego-tree",
  "itertools",
  "nom",
  "reqwest",
@@ -4015,12 +4006,6 @@ name = "utf-8"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09cc8ee72d2a9becf2f2febe0205bbed8fc6615b7cb429ad062dc7b7ddd036a9"
-
-[[package]]
-name = "utf8-width"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86bd8d4e895da8537e5315b8254664e6b769c4ff3db18321b297a1e7004392e3"
 
 [[package]]
 name = "utf8_iter"

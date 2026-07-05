@@ -23,29 +23,54 @@ impl Supermusic {
         document: &scraper::Html,
         txt_export_document: String,
     ) -> anyhow::Result<super::core::LyricsWithChords> {
-        let song_name_selector = Selector::parse(".test3").map_err(|_| {
+        let artist_selector = Selector::parse(".info-bar-artist").map_err(|_| {
+            io::Error::new(io::ErrorKind::InvalidData, "Failed to create selector!")
+        })?;
+        let song_name_selector = Selector::parse(".info-bar-song").map_err(|_| {
             io::Error::new(io::ErrorKind::InvalidData, "Failed to create selector!")
         })?;
 
-        let whole_song_title = document
+        let artist = document
+            .select(&artist_selector)
+            .nth(0)
+            .context("Unexpected document structure! (artist)")?
+            .text()
+            .collect::<String>()
+            .trim()
+            .to_string();
+
+        let song_name = document
             .select(&song_name_selector)
             .nth(0)
-            .context("Unexpected document structure!")?
+            .context("Unexpected document structure! (song name)")?
             .text()
-            .nth(0)
-            .context("No song name in DOM!")?;
-
-        let [artist, song_name] = whole_song_title.split(" - ").collect::<Vec<&str>>()[0..2] else {
-            return Err(anyhow::Error::msg("Unexpected structure of song title"));
-        };
+            .collect::<String>()
+            .trim()
+            .to_string();
 
         println!("Parsed artist and song: {artist}: {song_name}");
 
         let lf_template = txt_export_document.replace("\r\n", "\n");
         let mut song_template: Vec<&str> = lf_template.split("\n").collect();
 
-        // remove whitespace
-        song_template.drain(0..2);
+        // The exported .txt file is prefixed with a variable number of metadata
+        // lines (song title, and sometimes a duplicate "artist- title" line)
+        // before the lyrics/chords start. Strip them by matching against the
+        // artist/title we already parsed from the page, since the exact count
+        // of header lines differs between older and newer catalogue entries.
+        while let Some(first) = song_template.first() {
+            let trimmed = first.trim();
+            let is_metadata_line = trimmed.is_empty()
+                || trimmed.eq_ignore_ascii_case(&song_name)
+                || trimmed.eq_ignore_ascii_case(&format!("{artist}- {song_name}"))
+                || trimmed.eq_ignore_ascii_case(&format!("{artist} - {song_name}"));
+
+            if !is_metadata_line {
+                break;
+            }
+
+            song_template.remove(0);
+        }
 
         let nodes = match parse_lyrics_with_chords::<(&str, ErrorKind)>(&song_template.join("\n")) {
             Ok(r) => r,
@@ -232,16 +257,62 @@ impl Supermusic {
             .unwrap();
 
         let text_export_url = format!(
-            "https://supermusic.cz/export.php?idpiesne={}&stiahni=1&typ=TXT&sid=",
+            "https://www.supermusic.cz/export.php?idpiesne={}&stiahni=1&typ=TXT&sid=",
             song_id
         );
 
+        // The bare `supermusic.cz` domain 301-redirects to `www.supermusic.cz`.
+        // We resolve that ourselves (rather than letting reqwest follow it) because
+        // the anti-bot cookie we attach below would otherwise be dropped by
+        // reqwest across that cross-host hop.
+        let main_url = ensure_www_host(&url);
+
         let client = Client::new();
-        let text_export_response = client.get(text_export_url).send().await?.text().await?;
-        let main_document = client.get(url).send().await?.text().await?;
+        let text_export_response = fetch_bypassing_bot_check(&client, &text_export_url).await?;
+        let main_document = fetch_bypassing_bot_check(&client, &main_url).await?;
 
         Self::get(&Html::parse_document(&main_document), text_export_response)
     }
+}
+
+/// supermusic.cz shows visitors without a prior verified session a lightweight
+/// interstitial page: it sets a `_sm_verified` cookie via a client-side script
+/// and then reloads the original URL. Since we don't run JS, we read that
+/// cookie value straight out of the interstitial's markup and replay it as a
+/// request header on a second attempt.
+async fn fetch_bypassing_bot_check(client: &Client, url: &str) -> anyhow::Result<String> {
+    let text = client.get(url).send().await?.text().await?;
+
+    let Some(cookie_value) = extract_verification_cookie(&text) else {
+        return Ok(text);
+    };
+
+    Ok(client
+        .get(url)
+        .header(
+            reqwest::header::COOKIE,
+            format!("_sm_verified={cookie_value}"),
+        )
+        .send()
+        .await?
+        .text()
+        .await?)
+}
+
+fn ensure_www_host(url: &str) -> String {
+    if url.contains("://www.supermusic.cz") {
+        url.to_string()
+    } else {
+        url.replacen("supermusic.cz", "www.supermusic.cz", 1)
+    }
+}
+
+fn extract_verification_cookie(html: &str) -> Option<String> {
+    let marker = "_sm_verified=";
+    let start = html.find(marker)? + marker.len();
+    let end = html[start..].find(';')? + start;
+
+    Some(html[start..end].to_string())
 }
 
 fn string<'a, const ALLOW_NEWLINE: bool, E: ParseError<&'a str> + ContextError<&'a str>>(
