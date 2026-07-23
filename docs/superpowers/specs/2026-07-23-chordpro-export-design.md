@@ -1,5 +1,7 @@
 # ChordPro export — design
 
+> **Superseded in part:** `write_chordpro` is now a `#[tauri::command]` writing one file per song into a directory (`dir: String` parameter), not a plain fn writing a single bundled file (`path: String`) as described below. See [2026-07-23-frontend-integration-design.md](2026-07-23-frontend-integration-design.md) for the current interface and rationale. Kept here as the historical record of the original design.
+
 ## Goal
 
 Support exporting `LyricsWithChords` songs as [ChordPro](https://www.chordpro.org/chordpro/home/) text, alongside the existing docx export. For now this is wired up only through a hardcoded song list in `main.rs` — no Tauri command, no frontend integration.
