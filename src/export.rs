@@ -262,3 +262,72 @@ pub fn transpose(nodes: Vec<TextNode>, modifier: i32) -> Vec<TextNode> {
 
     return dummy_lyrics.text;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{sanitize_filename, write_chordpro};
+    use crate::domain::core::{LyricsWithChords, TextNode};
+    use std::{
+        fs,
+        sync::atomic::{AtomicU64, Ordering},
+    };
+
+    fn temp_dir() -> std::path::PathBuf {
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+        let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+        std::env::temp_dir().join(format!("spevnik-write-chordpro-test-{n}"))
+    }
+
+    #[test]
+    fn sanitize_filename_replaces_unsafe_characters() {
+        assert_eq!(
+            sanitize_filename("AC/DC - Highway\\To*Hell?\"<>|"),
+            "AC-DC - Highway-To-Hell-----"
+        );
+    }
+
+    #[test]
+    fn sanitize_filename_leaves_safe_characters_untouched() {
+        assert_eq!(sanitize_filename("Eric Clapton - Tears in Heaven"), "Eric Clapton - Tears in Heaven");
+    }
+
+    #[test]
+    fn write_chordpro_writes_one_file_per_song() {
+        let dir = temp_dir();
+
+        let songs = vec![
+            LyricsWithChords::new(
+                vec![TextNode::Text("first song".to_string())],
+                "Artist One".to_string(),
+                "Song One".to_string(),
+            ),
+            LyricsWithChords::new(
+                vec![TextNode::Text("second song".to_string())],
+                "Artist Two".to_string(),
+                "Song Two".to_string(),
+            ),
+        ];
+
+        write_chordpro(songs.clone(), dir.to_string_lossy().to_string()).unwrap();
+
+        let first_content = fs::read_to_string(dir.join("Artist One - Song One.cho")).unwrap();
+        let second_content = fs::read_to_string(dir.join("Artist Two - Song Two.cho")).unwrap();
+
+        assert_eq!(first_content, songs[0].render_chordpro());
+        assert_eq!(second_content, songs[1].render_chordpro());
+
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn write_chordpro_creates_the_directory_if_missing() {
+        let dir = temp_dir();
+        assert!(!dir.exists());
+
+        write_chordpro(vec![], dir.to_string_lossy().to_string()).unwrap();
+
+        assert!(dir.is_dir());
+
+        fs::remove_dir_all(&dir).unwrap();
+    }
+}
