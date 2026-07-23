@@ -234,6 +234,16 @@ pub fn write_docx(songs: Vec<LyricsWithChords>, path: String) -> Result<(), Stri
         .map(|_| ())
 }
 
+pub fn write_chordpro(songs: Vec<LyricsWithChords>, path: String) -> Result<(), String> {
+    let contents = songs
+        .iter()
+        .map(|song| song.clone().render_chordpro())
+        .collect::<Vec<String>>()
+        .join("\n{new_song}\n");
+
+    std::fs::write(path, contents).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub fn transpose(nodes: Vec<TextNode>, modifier: i32) -> Vec<TextNode> {
     let mut dummy_lyrics = LyricsWithChords::new(nodes, "".to_string(), "".to_string());
