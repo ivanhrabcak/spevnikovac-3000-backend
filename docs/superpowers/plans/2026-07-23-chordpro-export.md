@@ -12,7 +12,7 @@
 
 - No `#[tauri::command]` annotation on any new function — this feature is not exposed to the frontend yet (per design doc).
 - No new crate dependencies.
-- Chorus detection: any line containing a `TextNode::Label` starts a chorus (`{start_of_chorus}`); the label's literal text is not rendered. A blank line (a line with zero nodes) while inside a chorus closes it (`{end_of_chorus}`); if the song ends while still inside a chorus, close it after the last line.
+- ~~Chorus detection: any line containing a `TextNode::Label` starts a chorus (`{start_of_chorus}`); the label's literal text is not rendered. A blank line (a line with zero nodes) while inside a chorus closes it (`{end_of_chorus}`); if the song ends while still inside a chorus, close it after the last line.~~ Superseded: this inference didn't work reliably in practice and was removed. `TextNode::Label` now renders as its literal text on its own line (e.g. `®:`), same as `render_docx` already did — no directives, no chorus state tracking.
 - ~~Single output file per `write_chordpro` call...~~ Superseded by Task 4: `write_chordpro` now writes one `.cho` file per song into a directory, named `"{artist} - {song_name}.cho"` — this is the actual convention ChordPro tooling expects, not a single bundled file.
 
 ---

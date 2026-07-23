@@ -109,22 +109,9 @@ impl LyricsWithChords {
         let mut output_lines: Vec<String> =
             vec![format!("{{title: {}}}", self.song_name), format!("{{artist: {}}}", self.artist)];
 
-        let mut in_chorus = false;
-
         for line in lines {
             if line.is_empty() {
-                if in_chorus {
-                    output_lines.push("{end_of_chorus}".to_string());
-                    in_chorus = false;
-                }
-
                 output_lines.push(String::new());
-                continue;
-            }
-
-            if line.iter().any(|n| matches!(n, TextNode::Label(_))) {
-                output_lines.push("{start_of_chorus}".to_string());
-                in_chorus = true;
                 continue;
             }
 
@@ -132,20 +119,17 @@ impl LyricsWithChords {
             for node in line {
                 match node {
                     TextNode::Text(t) => rendered_line.push_str(&t),
+                    TextNode::Label(l) => rendered_line.push_str(&l),
                     TextNode::Chord(ch) => {
                         rendered_line.push('[');
                         rendered_line.push_str(&ch);
                         rendered_line.push(']');
                     }
-                    TextNode::Label(_) | TextNode::Newline => unreachable!(),
+                    TextNode::Newline => unreachable!(),
                 }
             }
 
             output_lines.push(rendered_line);
-        }
-
-        if in_chorus {
-            output_lines.push("{end_of_chorus}".to_string());
         }
 
         output_lines.join("\n")
@@ -345,7 +329,7 @@ Amaz[G]ing grace";
     }
 
     #[test]
-    fn render_chordpro_chorus_closed_by_blank_line() {
+    fn render_chordpro_label_rendered_as_literal_text_mid_song() {
         let song = LyricsWithChords::new(
             vec![
                 TextNode::Text("Verse line".to_string()),
@@ -367,9 +351,8 @@ Amaz[G]ing grace";
 {artist: Artist}
 Verse line
 
-{start_of_chorus}
+®:
 Chorus line
-{end_of_chorus}
 
 Outro line";
 
@@ -377,7 +360,7 @@ Outro line";
     }
 
     #[test]
-    fn render_chordpro_chorus_open_at_end_of_song() {
+    fn render_chordpro_label_rendered_as_literal_text_at_end_of_song() {
         let song = LyricsWithChords::new(
             vec![
                 TextNode::Label("®:".to_string()),
@@ -391,9 +374,8 @@ Outro line";
         let expected = "\
 {title: Song}
 {artist: Artist}
-{start_of_chorus}
-Last chorus line
-{end_of_chorus}";
+®:
+Last chorus line";
 
         assert_eq!(song.render_chordpro(), expected);
     }

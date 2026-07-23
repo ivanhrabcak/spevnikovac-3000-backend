@@ -1,6 +1,8 @@
 # ChordPro export — design
 
 > **Superseded in part:** `write_chordpro` is now a `#[tauri::command]` writing one file per song into a directory (`dir: String` parameter), not a plain fn writing a single bundled file (`path: String`) as described below. See [2026-07-23-frontend-integration-design.md](2026-07-23-frontend-integration-design.md) for the current interface and rationale. Kept here as the historical record of the original design.
+>
+> **Superseded in part:** The chorus inference described below (`{start_of_chorus}`/`{end_of_chorus}` directives, inferred from `Label` nodes and closed by a blank line or end of song) was removed — it didn't work reliably in practice. `render_chordpro` now renders `TextNode::Label` as its literal text on its own line (e.g. `®:`), same as `render_docx` already did, with no inferred directives. Kept here as the historical record of the original design.
 
 ## Goal
 
