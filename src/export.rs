@@ -234,14 +234,23 @@ pub fn write_docx(songs: Vec<LyricsWithChords>, path: String) -> Result<(), Stri
         .map(|_| ())
 }
 
-pub fn write_chordpro(songs: Vec<LyricsWithChords>, path: String) -> Result<(), String> {
-    let contents = songs
-        .iter()
-        .map(|song| song.clone().render_chordpro())
-        .collect::<Vec<String>>()
-        .join("\n{new_song}\n");
+pub fn write_chordpro(songs: Vec<LyricsWithChords>, dir: String) -> Result<(), String> {
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
 
-    std::fs::write(path, contents).map_err(|e| e.to_string())
+    for song in songs.iter() {
+        let file_name = sanitize_filename(&format!("{} - {}", song.artist, song.song_name));
+        let path = std::path::Path::new(&dir).join(format!("{file_name}.cho"));
+
+        std::fs::write(path, song.render_chordpro()).map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
+fn sanitize_filename(name: &str) -> String {
+    name.chars()
+        .map(|c| if "/\\:*?\"<>|".contains(c) { '-' } else { c })
+        .collect()
 }
 
 #[tauri::command]

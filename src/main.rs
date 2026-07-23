@@ -80,7 +80,7 @@ async fn main() {
         // write_docx(vec![lyrics], "songs.docx".to_string()).unwrap();
     }
 
-    if let Err(e) = write_chordpro(all_lyrics, "songs.cho".to_string()) {
+    if let Err(e) = write_chordpro(all_lyrics, "songs".to_string()) {
         eprintln!("Failed to write ChordPro output: {e}");
     }
 
