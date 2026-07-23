@@ -1,5 +1,5 @@
 use domain::{core::LyricsWithChords, supermusic::Supermusic, ultimate_guitar::UltimateGuitar};
-use export::{get_editing_hints, write_docx};
+use export::{get_editing_hints, write_chordpro, write_docx};
 use scraper::Html;
 
 pub mod domain;
@@ -78,6 +78,10 @@ async fn main() {
         all_lyrics.push(lyrics);
 
         // write_docx(vec![lyrics], "songs.docx".to_string()).unwrap();
+    }
+
+    if let Err(e) = write_chordpro(all_lyrics, "songs.cho".to_string()) {
+        eprintln!("Failed to write ChordPro output: {e}");
     }
 
     println!("Done!");
