@@ -89,6 +89,68 @@ impl LyricsWithChords {
         paragraphs
     }
 
+    pub fn render_chordpro(&self) -> String {
+        let mut lines: Vec<Vec<TextNode>> = Vec::new();
+        let mut current_line: Vec<TextNode> = Vec::new();
+
+        for node in self.text.iter() {
+            if matches!(node, TextNode::Newline) {
+                lines.push(current_line);
+                current_line = Vec::new();
+            } else {
+                current_line.push(node.clone());
+            }
+        }
+
+        if !current_line.is_empty() {
+            lines.push(current_line);
+        }
+
+        let mut output_lines: Vec<String> =
+            vec![format!("{{title: {}}}", self.song_name), format!("{{artist: {}}}", self.artist)];
+
+        let mut in_chorus = false;
+
+        for line in lines {
+            if line.is_empty() {
+                if in_chorus {
+                    output_lines.push("{end_of_chorus}".to_string());
+                    in_chorus = false;
+                }
+
+                output_lines.push(String::new());
+                continue;
+            }
+
+            if line.iter().any(|n| matches!(n, TextNode::Label(_))) {
+                output_lines.push("{start_of_chorus}".to_string());
+                in_chorus = true;
+                continue;
+            }
+
+            let mut rendered_line = String::new();
+            for node in line {
+                match node {
+                    TextNode::Text(t) => rendered_line.push_str(&t),
+                    TextNode::Chord(ch) => {
+                        rendered_line.push('[');
+                        rendered_line.push_str(&ch);
+                        rendered_line.push(']');
+                    }
+                    TextNode::Label(_) | TextNode::Newline => unreachable!(),
+                }
+            }
+
+            output_lines.push(rendered_line);
+        }
+
+        if in_chorus {
+            output_lines.push("{end_of_chorus}".to_string());
+        }
+
+        output_lines.join("\n")
+    }
+
     fn transpose_chord(chord: String, modifier: i32) -> String {
         let mut transposed_chord: String;
 
@@ -256,4 +318,83 @@ pub enum TextNode {
     Chord(String),
     Label(String),
     Newline,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{LyricsWithChords, TextNode};
+
+    #[test]
+    fn render_chordpro_plain_line_with_inline_chord() {
+        let song = LyricsWithChords::new(
+            vec![
+                TextNode::Text("Amaz".to_string()),
+                TextNode::Chord("G".to_string()),
+                TextNode::Text("ing grace".to_string()),
+            ],
+            "Traditional".to_string(),
+            "Amazing Grace".to_string(),
+        );
+
+        let expected = "\
+{title: Amazing Grace}
+{artist: Traditional}
+Amaz[G]ing grace";
+
+        assert_eq!(song.render_chordpro(), expected);
+    }
+
+    #[test]
+    fn render_chordpro_chorus_closed_by_blank_line() {
+        let song = LyricsWithChords::new(
+            vec![
+                TextNode::Text("Verse line".to_string()),
+                TextNode::Newline,
+                TextNode::Newline,
+                TextNode::Label("®:".to_string()),
+                TextNode::Newline,
+                TextNode::Text("Chorus line".to_string()),
+                TextNode::Newline,
+                TextNode::Newline,
+                TextNode::Text("Outro line".to_string()),
+            ],
+            "Artist".to_string(),
+            "Song".to_string(),
+        );
+
+        let expected = "\
+{title: Song}
+{artist: Artist}
+Verse line
+
+{start_of_chorus}
+Chorus line
+{end_of_chorus}
+
+Outro line";
+
+        assert_eq!(song.render_chordpro(), expected);
+    }
+
+    #[test]
+    fn render_chordpro_chorus_open_at_end_of_song() {
+        let song = LyricsWithChords::new(
+            vec![
+                TextNode::Label("®:".to_string()),
+                TextNode::Newline,
+                TextNode::Text("Last chorus line".to_string()),
+            ],
+            "Artist".to_string(),
+            "Song".to_string(),
+        );
+
+        let expected = "\
+{title: Song}
+{artist: Artist}
+{start_of_chorus}
+Last chorus line
+{end_of_chorus}";
+
+        assert_eq!(song.render_chordpro(), expected);
+    }
 }
