@@ -234,6 +234,7 @@ pub fn write_docx(songs: Vec<LyricsWithChords>, path: String) -> Result<(), Stri
         .map(|_| ())
 }
 
+#[tauri::command]
 pub fn write_chordpro(songs: Vec<LyricsWithChords>, dir: String) -> Result<(), String> {
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
 
