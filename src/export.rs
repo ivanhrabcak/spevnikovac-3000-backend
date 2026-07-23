@@ -15,7 +15,7 @@ use docx::{
 use itertools::Itertools;
 use scraper::Html;
 use serde::{Deserialize, Serialize};
-use tauri::{scope::ipc::RemoteDomainAccessScope, AppHandle, Manager, WindowBuilder, WindowUrl};
+use tauri::{AppHandle, WebviewUrl, WebviewWindowBuilder};
 use tokio::sync::oneshot;
 
 use crate::domain::{
@@ -75,22 +75,15 @@ pub fn report_ug_page(label: String, html: String) {
 
 async fn fetch_ultimate_guitar_html(app: &AppHandle, url: &str) -> anyhow::Result<String> {
     let parsed_url: tauri::Url = url.parse().context("Invalid URL")?;
-    let domain = parsed_url
-        .domain()
-        .context("URL has no domain")?
-        .to_string();
 
     let label = next_fetch_label();
 
-    // Remote pages don't get access to the Tauri IPC bridge by default; grant
-    // it just for this one throwaway window/domain pair so our injected
-    // script can call `report_ug_page` back.
-    app.ipc_scope().configure_remote_access(
-        RemoteDomainAccessScope::new(domain)
-            .add_window(&label)
-            .enable_tauri_api(),
-    );
-
+    // Remote pages don't get access to the Tauri IPC bridge by default. Tauri
+    // 1.x let us grant it dynamically at runtime (per window/domain); Tauri 2
+    // requires it to be declared statically instead, via a capability in the
+    // consuming app's (spevnikovac-3000) tauri.conf.json that allows the
+    // `report_ug_page` permission for windows labeled `ug-fetch-*` with a
+    // `remote.urls` entry matching Ultimate Guitar's domain.
     let (tx, rx) = oneshot::channel();
     PENDING_UG_FETCHES.lock().unwrap().insert(label.clone(), tx);
 
@@ -104,7 +97,7 @@ async fn fetch_ultimate_guitar_html(app: &AppHandle, url: &str) -> anyhow::Resul
                 var hasContent = !!document.querySelector('pre');
                 if (ready && (hasContent || force)) {{
                     reported = true;
-                    window.__TAURI_INVOKE__('report_ug_page', {{ label: LABEL, html: document.documentElement.outerHTML }});
+                    window.__TAURI_INTERNALS__.invoke('report_ug_page', {{ label: LABEL, html: document.documentElement.outerHTML }});
                 }}
             }}
             document.addEventListener('readystatechange', function() {{ trySend(false); }});
@@ -120,7 +113,7 @@ async fn fetch_ultimate_guitar_html(app: &AppHandle, url: &str) -> anyhow::Resul
         label = serde_json::to_string(&label).unwrap(),
     );
 
-    let window = WindowBuilder::new(app, &label, WindowUrl::External(parsed_url))
+    let window = WebviewWindowBuilder::new(app, &label, WebviewUrl::External(parsed_url))
         .title("Načítavam akordy...")
         .inner_size(480.0, 720.0)
         .visible(false)

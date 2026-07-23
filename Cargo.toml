@@ -16,4 +16,4 @@ xml = "0.8.20"
 docx = { git = "https://github.com/ivanhrabcak/docx-rs" }
 itertools = "0.13.0"
 serde = { version = "1.0.209", features = ["derive"] }
-tauri = "1.7.2"
+tauri = "2.11.5"
